@@ -53,7 +53,10 @@ def forecast(catchment):
     if get_config(database, modeltype) is None:
         return message(False, None, "This forecasttype is not found in the configuration file.")
     else:
-        model = pickle.load(open(join(database.filename, modeltype + '.p'), "rb"))
+        try:
+            model = pickle.load(open(join(database.filename, modeltype + '.p'), "rb"))
+        except:
+            return message(False, None, "No trained model was found. Train model bedore forecasting")
         data = model.single_targetset(date)
         if isnan(data):
             value = model.forecast(date)
