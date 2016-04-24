@@ -451,7 +451,7 @@ if __name__ == '__main__':
 
     # Select database (catchment)
     database = DatabaseLoader(
-        '/home/jules/Dropbox (hydrosolutions)/Hydromet/Forecasting_Dev/Forecasting_KG/database/pskem')
+        '/home/jules/Dropbox (hydrosolutions)/Hydromet/Forecasting_Dev/Forecasting_KG/sample_database/chatkal')
 
     # Select target and feature dataset(s) --> [target, feature1, feature2, ... ]
     datasets = [Dataset('runoff', database), Dataset('runoff', database), Dataset('temp', database),

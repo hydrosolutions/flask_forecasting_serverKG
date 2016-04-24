@@ -4,7 +4,7 @@ import os
 import pickle
 from math import isnan
 from os import makedirs, rmdir, remove, walk
-from os.path import join, isdir
+from os.path import join, isdir, realpath, dirname
 from urllib2 import urlopen
 
 from flask import Flask, request
@@ -12,8 +12,7 @@ from werkzeug import secure_filename
 
 from timeseriesFC import Forecaster, config2paramdict, DatabaseLoader
 
-ROOT_FOLDER = '/home/jules/flaskserver/'
-DATA_FOLDER = join(ROOT_FOLDER, 'data')
+DATA_FOLDER = join(dirname(realpath(__file__)),'sample_database/')
 UPLOAD_FOLDER = DATA_FOLDER
 ALLOWED_EXTENSIONS = {'csv', 'json'}
 app = Flask(__name__)
@@ -22,18 +21,14 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 
 def setup_app(app):
-    if not isdir(ROOT_FOLDER):
-        makedirs(ROOT_FOLDER)
-    elif not isdir(DATA_FOLDER):
+    if not isdir(DATA_FOLDER):
         makedirs(DATA_FOLDER)
-
 
 setup_app(app)
 
-
 @app.route('/')
 def status():
-    return message(True, None, ROOT_FOLDER)
+    return message(True, None, DATA_FOLDER)
 
 
 @app.route('/forecast/<catchment>')

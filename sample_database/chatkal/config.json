@@ -1,0 +1,12 @@
+{
+    "monthly":{
+        "datasets":["runoff","runoff","temp","precip"],
+        "leadtimes":[[1,3],[-24,-1],[-24,-1],[-24,-1]],
+        "scoremethod":"soviet_longterm",
+        "fillnan":true,
+		"modeltype":"RF",
+		"modelparam":{
+					"n_estimators":100
+					}
+    }
+}
