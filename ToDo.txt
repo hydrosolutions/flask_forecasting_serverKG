@@ -1,0 +1,2 @@
+-- Remove daily dataset references. Focus on decadal datasets only --> purify code
+-- Setup requirement.txt so Tobi can start playing
