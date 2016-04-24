@@ -1,3 +1,4 @@
 *.png
 database
 .idea
+*.pyc
