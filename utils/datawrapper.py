@@ -32,7 +32,7 @@ class Dataset(object):
     #         first_date=self.method.first_date()
     #         return {first_date.year: [float('nan')] * dateformat.datesperyear()}
 
-    def get_feature(self, date, n=1, threshold=0, fillnan=False):
+    def get_feature(self, date, n=1, threshold=0.0):
         """ Return timeseries as list from date backward in time for n time steps"""
         features = []
         nan = 0
@@ -47,15 +47,14 @@ class Dataset(object):
                 date = date.timedelta(-1)
         except:
             return [np.nan]
+        features.reverse()
+        features = np.array(features)
         if float(nan) / n > threshold:
             return [np.nan]
-        else:
-            features.reverse()
-            features = np.array(features)
-            if nan > 0 and fillnan:
+        elif nan > 0:
                 nans, x = self.nan_helper(features)
                 features[nans] = np.interp(x(nans), x(~nans), features[~nans])
-            return features
+        return features
 
     @staticmethod
     def nan_helper(x):
@@ -172,7 +171,7 @@ class TransformedDataset(object):
         self.data = datadict
         self.years = years
 
-    def get_feature(self, date, n=1, threshold=0, fillnan=False):
+    def get_feature(self, date, n=1, threshold=0.0):
         # gives back timeseries of n decades length
         features = []
         nan = 0
@@ -187,15 +186,14 @@ class TransformedDataset(object):
                 date = date.timedelta(-1)
         except:
             return [np.nan]
+        features.reverse()
+        features = np.array(features)
         if float(nan) / n > threshold:
             return [np.nan]
-        else:
-            features.reverse()
-            features = np.array(features)
-            if nan > 0 and fillnan:
-                nans, x = self.nan_helper(features)
-                features[nans] = np.interp(x(nans), x(~nans), features[~nans])
-            return features
+        elif nan > 0:
+            nans, x = self.nan_helper(features)
+            features[nans] = np.interp(x(nans), x(~nans), features[~nans])
+        return features
 
     @staticmethod
     def nan_helper(x):

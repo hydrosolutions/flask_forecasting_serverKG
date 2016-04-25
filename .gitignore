@@ -3,3 +3,5 @@ database
 .idea
 *.pyc
 *.docx
+__init__.py
+*.p

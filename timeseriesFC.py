@@ -3,17 +3,18 @@ import datetime
 from os import path, remove
 
 import numpy as np
+from matplotlib import pyplot as plt
 from sklearn.cross_validation import StratifiedKFold
 from sklearn.ensemble import RandomForestRegressor, ExtraTreesRegressor
 from sklearn.metrics import r2_score
 
 from utils.datawrapper import Dataset
-from utils.tools import DatabaseLoader
 from utils.special_datetime import DecadalDate as DateFormat
+from utils.tools import DatabaseLoader
 
 
 class Forecaster(object):
-    def __init__(self, modeltype, datasets, leadtimes, mode='default', fillnan=False, scoremethod='R2'):
+    def __init__(self, modeltype, datasets, leadtimes, mode='default', fillnan=0.0, scoremethod='R2'):
         self.datasets = datasets
         self.model = modeltype
         self.lead_times = self.check_lead_time_order(leadtimes)
@@ -21,12 +22,12 @@ class Forecaster(object):
             self.forecast = self.forecastwithaverage
         elif mode == 'naivelast':
             self.forecast = self.forecastwithlast
-        self.fillnan = fillnan
-        if fillnan:
-            self.threshold = 0.075
-        else:
-            self.threshold = 0
+        self.threshold = fillnan
         self.scoremethod = scoremethod
+        np.seterr(invalid='ignore')
+
+    def update_datasets(self, datasets):
+        self.datasets = datasets
 
     def cross_validate(self, daterange=None, folds=10, output=None):
         if output is None:
@@ -127,7 +128,7 @@ class Forecaster(object):
         position = 0
         for i, dataset in enumerate(self.datasets[1:]):
             length = self.lead_time2length([lead_times[i]])
-            timeseries = dataset.get_feature(date.timedelta(lead_times[i][1]), length, self.threshold, self.fillnan)
+            timeseries = dataset.get_feature(date.timedelta(lead_times[i][1]), length, self.threshold)
             if timeseries is not np.nan:
                 singlefeatureset[position:position + length] = timeseries
             else:
@@ -264,7 +265,6 @@ class Forecaster(object):
             datelist[i] = date.firstdate()
 
         if output == 'timeseries':
-            from matplotlib import pyplot as plt
             plt.figure(figsize=(15, 5))
             # plt.figure(figsize=(7,5))
 
@@ -281,7 +281,6 @@ class Forecaster(object):
             return None
 
         elif output == 'correlation':
-            from matplotlib import pyplot as plt
             plt.figure(figsize=(5, 5))
             plt.plot(observed, predicted, linestyle='None', marker='.')
             maxval = int(np.nanmax([np.max(observed), np.nanmax(predicted)]))
@@ -320,8 +319,6 @@ class Forecaster(object):
             error2 = np.ma.masked_invalid(error)
             error = [[y for y in row if y] for row in error2.T]
 
-            from matplotlib import pyplot as plt
-
             plt.figure(figsize=(15, 5))
             plt.boxplot(error, positions=dates, showmeans=True)
             plt.plot(axis, stdev, label='standard deviation')
@@ -355,8 +352,6 @@ class Forecaster(object):
                 error2 = np.ma.masked_invalid(error)
                 error = [[y for y in row if y] for row in error2.T]
 
-                from matplotlib import pyplot as plt
-
                 plt.figure(figsize=(15, 5))
                 plt.plot(axis, stdev, label='standard deviation')
                 plt.axhline(0.674, linestyle='--', color='g', label='67.4% of standard deviation')
@@ -382,12 +377,12 @@ class Forecaster(object):
             j = 0
             for i, dataset in enumerate(self.datasets[1:]):
                 length = self.lead_time2length([self.lead_times[i + 1]])
+                vecpart = vec[j:j + length]
                 tailtimes.append(range(self.lead_times[i + 1][0], self.lead_times[i + 1][1] + 1))
                 data.append(dataset.datatype)
                 importance.append(vecpart)
                 j += length
 
-            from matplotlib import pyplot as plt
             plt.figure(figsize=(10, 5))
             for i, vec in enumerate(importance):
                 plt.plot(tailtimes[i], vec, label=data[i])
@@ -451,111 +446,34 @@ if __name__ == '__main__':
 
     # Select database (catchment)
     database = DatabaseLoader(
-        '/home/jules/Dropbox (hydrosolutions)/Hydromet/Forecasting_Dev/Forecasting_KG/sample_database/chatkal')
+        '/home/jules/Dropbox (hydrosolutions)/Hydromet/Forecasting_Dev/Forecasting_KG/sample_database/pskem')
 
     # Select target and feature dataset(s) --> [target, feature1, feature2, ... ]
-    datasets = [Dataset('runoff', database), Dataset('runoff', database), Dataset('temp', database),
-                Dataset('precip', database)]
+    datasets = [Dataset('runoff', database), Dataset('runoff', database), Dataset('temp', database), Dataset('precip', database)]
 
     # Select leadtimes for target and feature. negative:past/positive:future
     leadtimes = [[1, 3], [-24, -1], [-24, -1], [-24, -1]]
 
     # Select Model
-    # model_type=Lasso(alpha=1)
-
-    # from sknn.mlp import Regressor, Layer, MultiLayerPerceptron
-    # model_type=Regressor(layers=[Layer("Sigmoid", units=50),Layer("Linear")],learning_rate=0.1,n_iter=100)
     model_type = RandomForestRegressor(n_estimators=100, bootstrap=True, min_weight_fraction_leaf=0, max_depth=None)
 
     # Set training interval
     startyear = DateFormat(1933, 1)
-    endyear = DateFormat(2015, 36)
+    endyear = DateFormat(2005, 36)
     training_daterange = DateFormat.decadal_daterange(startyear, endyear)
 
     # Set testing interval
-    startyear = DateFormat(2015, 1)
-    endyear = DateFormat(2015, 1)
+    startyear = DateFormat(2006, 1)
+    endyear = DateFormat(2015, 36)
     testing_daterange = DateFormat.decadal_daterange(startyear, endyear)
     newtesting_daterange = []
     for date in testing_daterange:
-        if date.decade_of_year > 0:  # Selecting last decade of each month as issue date
+        if date.decade_of_year%3==0:  # Selecting last decade of each month as issue date
             newtesting_daterange.append(date)
 
     # Creates forecasting model with selected parameters
-    model = Forecaster(model_type, datasets, leadtimes, fillnan=True, scoremethod='soviet_longterm')
+    model = Forecaster(model_type, datasets, leadtimes, fillnan=0.0, scoremethod='soviet_longterm')
+    print model.cross_validate(training_daterange)
     model.train_model(training_daterange)
-    print model.forecast(DateFormat(2015, 1))
-    # print model.plot(newtesting_daterange,output='timeseries')
-
-    """## EXTENDED GRIDSEARCH FOR PARAMETERES AND DATASETS
-    gridsearch=[]
-    import itertools
-
-    RF_options = {'n_estimators': [100]}
-
-    product = [x for x in apply(itertools.product, RF_options.values())]
-    RF_list = [dict(zip(RF_options.keys(), p)) for p in product]
-
-    target=['runoff']
-    target_leadtime=[[0,0]]
-
-    available_datasets=['runoff','temp','dsca','sca']
-    DATA_list=[c for i in range(len(available_datasets)) for c in itertools.combinations(available_datasets, i+1)]
-
-    possible_leadtimes=[[-24,-1]]
-
-    for RF_option in RF_list:
-        for DATA in DATA_list:
-            n=len(DATA)
-            leadtime_list=list(itertools.product(possible_leadtimes,repeat=n))
-            for leadtimes in leadtime_list:
-                settings=dict(RF_option)
-                settings['DATA']=list(DATA)
-                settings['lead_times']=list(leadtimes)
-                gridsearch.append(settings)
-                model_type = RandomForestRegressor(**RF_option)
-
-                datasets=target+list(DATA)
-                leadtimeset=target_leadtime+list(leadtimes)
-                data_in=[]
-                for type in datasets:
-                    if type=='sca':
-                        data_in.append(DailyDataset(type, database))
-                    elif type=='dsca':
-                        data_in.append(DailyDataset('sca', database).transform2delta())
-                    else:
-                        data_in.append(Dataset(type, database))
-
-                model=Forecaster(model_type,data_in,leadtimeset)
-
-                from timeit import default_timer as timer
-                start = timer()
-                score=model.cross_validate(training_daterange,'soviet_shortterm')
-                end = timer()
-                gridsearch[-1]['elapsed time']=end - start
-                gridsearch[-1]['score']=score
-                print gridsearch[-1]
-
-
-
-    import xlsxwriter
-
-    workbook = xlsxwriter.Workbook('gridsearch_result.xlsx')
-    worksheet = workbook.add_worksheet()
-    row = 0
-    col = 0
-    for key in gridsearch[0].keys():
-        worksheet.write(row, col,  str(key))
-        col += 1
-
-    col=0
-    row += 1
-
-    for result in gridsearch:
-        for key in result.keys():
-            worksheet.write(row, col,  str(result[key]))
-            col += 1
-        col=0
-        row += 1
-
-    workbook.close()"""
+    print model.evaluate(newtesting_daterange)
+    model.plot(newtesting_daterange, output='timeseries',filename='timeseries.png')

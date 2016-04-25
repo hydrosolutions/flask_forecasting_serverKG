@@ -12,12 +12,11 @@ from werkzeug import secure_filename
 
 from timeseriesFC import Forecaster, config2paramdict, DatabaseLoader
 
-DATA_FOLDER = join(dirname(realpath(__file__)),'sample_database/')
-UPLOAD_FOLDER = DATA_FOLDER
+DATA_FOLDER = join(dirname(realpath(__file__)), 'sample_database/')
 ALLOWED_EXTENSIONS = {'csv', 'json'}
 app = Flask(__name__)
 app.config.from_object(__name__)
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['UPLOAD_FOLDER'] = DATA_FOLDER
 
 
 def setup_app(app):
@@ -29,7 +28,6 @@ setup_app(app)
 @app.route('/')
 def status():
     return message(True, None, DATA_FOLDER)
-
 
 @app.route('/forecast/<catchment>')
 def forecast(catchment):
@@ -45,13 +43,15 @@ def forecast(catchment):
             return message(False, None, "Date must be given as YYYYMMDD, e.g. 20150810 for 10. August 2015.")
     else:
         date = datetime.date.today()
-    if get_config(database, modeltype) is None:
+    config = get_config(database, modeltype)
+    if config is None:
         return message(False, None, "This forecasttype is not found in the configuration file.")
     else:
         try:
             model = pickle.load(open(join(database.filename, modeltype + '.p'), "rb"))
+            model.update_datasets(config2paramdict(config, database)['datasets'])
         except:
-            return message(False, None, "No trained model was found. Train model bedore forecasting")
+            return message(False, None, "No trained model was found. Train model before forecasting")
         data = model.single_targetset(date)
         if isnan(data):
             value = model.forecast(date)
@@ -105,6 +105,8 @@ def train_and_save(catchment):
 @app.route('/crossvalidate/<catchment>')
 def crossvalidate(catchment):
     modeltype = request.args.get('type', '')
+    if not modeltype:
+        return message(False,None,"No forecasting type has been specified")
     database = DatabaseLoader(join(DATA_FOLDER, catchment))
     config = get_config(database, modeltype)
     if config is None:
