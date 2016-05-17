@@ -2,10 +2,15 @@ import csv
 import datetime
 from os import path, remove
 
+from pyearth import Earth
+
+from sknn.mlp import Regressor, Layer, Convolution
+
 import numpy as np
 from matplotlib import pyplot as plt
 from sklearn.cross_validation import StratifiedKFold
 from sklearn.ensemble import RandomForestRegressor, ExtraTreesRegressor
+from sklearn.linear_model import Lasso
 from sklearn.metrics import r2_score
 
 from utils.datawrapper import Dataset
@@ -275,7 +280,7 @@ class Forecaster(object):
             plt.xticks(rotation=90)
             plt.tight_layout()
             # plt.gca().xaxis.set_major_locator(plt.NullLocator())
-            plt.legend()
+            plt.legend(loc='upper left')
             plt.draw()
             plt.savefig(filename)
             return None
@@ -446,19 +451,27 @@ if __name__ == '__main__':
 
     # Select database (catchment)
     database = DatabaseLoader(
-        '/home/jules/Dropbox (hydrosolutions)/Hydromet/Forecasting_Dev/Forecasting_KG/sample_database/pskem')
+        '/home/jules/Dropbox (hydrosolutions)/Hydromet/Forecasting_Dev/flask_forecasting_serverKG/sample_database/pskem')
 
     # Select target and feature dataset(s) --> [target, feature1, feature2, ... ]
-    datasets = [Dataset('runoff', database), Dataset('runoff', database), Dataset('temp', database), Dataset('precip', database)]
+    datasets = [Dataset('runoff', database),Dataset('runoff',database).normalized(),Dataset('temp',database).normalized(),Dataset('precip',database).normalized(), Dataset('season',database).normalized()]
 
     # Select leadtimes for target and feature. negative:past/positive:future
-    leadtimes = [[1, 3], [-24, -1], [-24, -1], [-24, -1]]
+    leadtimes = [[1, 3],[-4,-1],[-4,-1],[-4,-1],[1,1]]
 
     # Select Model
-    model_type = RandomForestRegressor(n_estimators=100, bootstrap=True, min_weight_fraction_leaf=0, max_depth=None)
+    model_type = Earth(max_degree=10, smooth=True)
+    #model_type= Lasso(alpha=0.05,normalize=True, max_iter=3000)
+    #model_type = Regressor(
+    #    layers=[
+    #        Layer("Sigmoid",units=5),
+    #        Layer("Linear", units=1)],
+    #    learning_rate=0.1,
+    #    n_iter=1000)
+
 
     # Set training interval
-    startyear = DateFormat(1933, 1)
+    startyear = DateFormat(1900, 1)
     endyear = DateFormat(2005, 36)
     training_daterange = DateFormat.decadal_daterange(startyear, endyear)
 
@@ -468,12 +481,17 @@ if __name__ == '__main__':
     testing_daterange = DateFormat.decadal_daterange(startyear, endyear)
     newtesting_daterange = []
     for date in testing_daterange:
-        if date.decade_of_year%3==0:  # Selecting last decade of each month as issue date
+        if date.decade_of_year>0:  # Selecting last decade of each month as issue date
             newtesting_daterange.append(date)
+
+    startyear=DateFormat(2006,1)
+    endyear=DateFormat(2010,36)
+    plotdaterange=DateFormat.decadal_daterange(startyear,endyear)
+
 
     # Creates forecasting model with selected parameters
     model = Forecaster(model_type, datasets, leadtimes, fillnan=0.0, scoremethod='soviet_longterm')
-    print model.cross_validate(training_daterange)
+    #print model.cross_validate(training_daterange)
     model.train_model(training_daterange)
     print model.evaluate(newtesting_daterange)
-    model.plot(newtesting_daterange, output='timeseries',filename='timeseries.png')
+    model.plot(plotdaterange, output='timeseries',filename='timeseries.png')

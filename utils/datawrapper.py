@@ -138,10 +138,18 @@ class Dataset(object):
 
     def max(self):
         maxvalue = -9999
-        for date in DateFormat.decadal_daterange(DateFormat(self.years[0], 1), self.last_observation()):
+        for date in DateFormat.decadal_daterange(DateFormat(self.years[0], 1), self.last_observation().timedelta(-1)):
             if self.data[date.year][date.decade_of_year - 1] > maxvalue:
                 maxvalue = self.data[date.year][date.decade_of_year - 1]
         return maxvalue
+
+
+    def min(self):
+        minvalue = 9999
+        for date in DateFormat.decadal_daterange(DateFormat(self.years[0], 1), self.last_observation().timedelta(-1)):
+            if self.data[date.year][date.decade_of_year - 1] < minvalue:
+                minvalue = self.data[date.year][date.decade_of_year - 1]
+        return minvalue
 
     def transform2delta(self):
         datanew = dict()
@@ -156,12 +164,13 @@ class Dataset(object):
 
     def normalized(self):
         maxvalue = self.max()
+        minvalue = self.min()
         datanew = dict()
         for year in self.years:
             datanew.update({year: [float('nan')] * DateFormat.datesperyear()})
 
-        for date in DateFormat.decadal_daterange(DateFormat(self.years[0], 1), self.last_observation()):
-            datanew[date.year][date.decade_of_year - 1] = self.data[date.year][date.decade_of_year - 1] / maxvalue
+        for date in DateFormat.decadal_daterange(DateFormat(self.years[0], 1), self.last_observation().timedelta(-1)):
+            datanew[date.year][date.decade_of_year - 1] = (self.data[date.year][date.decade_of_year - 1]-minvalue) / (maxvalue-minvalue)
         return TransformedDataset(self.datatype, self.years, datanew)
 
 

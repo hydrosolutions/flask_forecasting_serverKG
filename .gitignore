@@ -5,3 +5,4 @@ database
 *.docx
 __init__.py
 *.p
+py-earth/
